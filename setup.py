@@ -23,11 +23,7 @@ setup(
     name=package_name,
     version="0.0.1",
     packages=[
-        package_name,
-        package_name + '.scripts',
-        package_name + '.scripts.models',
-        package_name + '.scripts.rbd',
-        package_name + '.scripts.rbd.idyntree'],
+        package_name],
     data_files=data_files,
     install_requires=["setuptools"],
     zip_safe=True,
