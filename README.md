@@ -2,6 +2,8 @@
 
 This package provides a teleoperation interface to control the Franka Emika Panda robot. This repository is cloned automatically into your workspace upon importing the repositories listed in the [`workspace.repos`](https://github.com/nicholaspalomo/panda_ros2_gazebo/blob/master/workspace.repos) of the accompanying [`panda_ros2_gazebo`](https://github.com/nicholaspalomo/panda_ros2_gazebo/) repository. You should first consult the installation instructions provided [there](https://github.com/nicholaspalomo/panda_ros2_gazebo/#installation). Please also make sure to install xterm on your machine.
 
+![Alt Text](media/rviz.gif)
+
 To launch this node, in a fresh terminal, source your workspace:
 ```
 $ source install/setup.bash
