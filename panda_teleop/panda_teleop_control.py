@@ -29,10 +29,11 @@ from rcl_interfaces.srv import GetParameters
 from std_srvs.srv import Empty
 
 # For teleop control
-import curses
 from rclpy.duration import Duration
 from rclpy.qos import qos_profile_system_default
 from std_msgs.msg import Header
+
+import sys, select, termios, tty
 
 # For 'q' keystroke exit
 import os
@@ -42,10 +43,10 @@ import time
 # Configure numpy output
 np.set_printoptions(precision=4, suppress=True)
 
-def execute(stdsrc, args):
+def execute(args):
     rclpy.init(args=args)
 
-    app = PandaTeleop(TextWindow(stdsrc))
+    app = PandaTeleop()
     app.poll_keys()
 
     app.destroy_node()
@@ -53,11 +54,7 @@ def execute(stdsrc, args):
 
 def quat2rpy(quat: Quaternion, degrees=True) -> List[float]:
 
-    if degrees:
-        return [angle * 180./np.pi for angle in list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler())] # return the roll-pitch-yaw in degrees...
-
-    else:
-        return list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler()) # ...or in radians
+    return list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler('xyz', degrees=degrees))
 
 def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
 
@@ -71,63 +68,30 @@ def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
 
     return out # return roll-pith-yaw angles as quaternion
 
-class TextWindow():
-
-    _screen = None
-    _window = None
-    _num_lines = None
-
-    def __init__(self, stdscr, lines=25):
-        self._screen = stdscr
-        self._screen.nodelay(True)
-        curses.curs_set(0)
-
-        self._num_lines = lines
-
-    def read_key(self):
-        keycode = self._screen.getch()
-        return keycode if keycode != -1 else None
-
-    def clear(self):
-        self._screen.clear()
-
-    def write_line(self, lineno, message):
-        if lineno < 0 or lineno >= self._num_lines:
-            raise ValueError('lineno out of bounds')
-        height, width = self._screen.getmaxyx()
-        y = (height / self._num_lines) * lineno
-        x = 10
-        for text in message.split('\n'):
-            text = text.ljust(width)
-            self._screen.addstr(int(y), int(x), text)
-            y += 1
-
-    def refresh(self):
-        self._screen.refresh()
-
-    def beep(self):
-        curses.flash()
-
 class PandaTeleop(Node):
-    def __init__(self, interface):
+    def __init__(self):
         super().__init__('panda_teleop_control')
 
-        self._interface = interface
         self._running = True
         self._last_pressed = {}
+        self._settings = termios.tcgetattr(sys.stdin)
 
         self.declare_parameters(
             namespace='',
             parameters=[
                 ('base_frame', None),
                 ('end_effector_frame', None),
+                ('end_effector_target_topic', None),
+                ('end_effector_pose_topic', None)
             ]
         )
-        self._hz = self.declare_parameter('hz', 10.0).value
 
+        # TODO: At the moment I'm unable to load the parameter directly from the parameter server. Later I need to modify this code to include that functionality.
         # Create end effector target publisher
-        self._end_effector_target_publisher: Publisher = self.create_publisher(Odometry, self.get_parameter('end_effector_target_topic').value, 10)
-        self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, self.get_parameter('end_effector_pose_topic').value, self.callback_end_effector_odom, 10)
+        self._end_effector_target_publisher: Publisher = self.create_publisher(Odometry, 'end_effector_target_pose', qos_profile_system_default)
+        self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, 'end_effector_pose', self.callback_end_effector_odom, 10)
+
+        self._hz = self.declare_parameter('hz', 10.0).value
 
         # Create a service for actuating the gripper. The service is requested via teleop
         self._actuate_gripper_client: Client = self.create_client(Empty, 'actuate_gripper')
@@ -141,8 +105,8 @@ class PandaTeleop(Node):
         self._end_effector_target_origin.pose.pose.orientation.y = 0.7071045301233027
         self._end_effector_target_origin.pose.pose.orientation.z = 0.00014171064119222223
         self._end_effector_target_origin.pose.pose.orientation.w = 0.7071090038427887
-        self._end_effector_target_origin.header.frame_id = self.get_parameter('base_frame').value
-        self._end_effector_target_origin.header.child_frame_id = self.get_parameter('end_effector_frame').value
+        self._end_effector_target_origin.header.frame_id = 'panda_link0'
+        self._end_effector_target_origin.child_frame_id = 'end_effector_frame'
         self._end_effector_target_origin.header.stamp = self.get_clock().now().to_msg()
 
         self._end_effector_target: Odometry = copy.deepcopy(self._end_effector_target_origin)
@@ -257,8 +221,8 @@ CURRENT END EFFECTOR POSE:
         now = self.get_clock().now()
         keys = []
         for a in self._last_pressed:
-            if now - self._last_pressed[a] < Duration(seconds=0.4):
-                keys.append(a)
+            # if now - self._last_pressed[a] < Duration(seconds=0.4):
+            keys.append(a)
 
         for k in keys:
             if k in self._planar_translation_bindings.keys():
@@ -309,41 +273,53 @@ CURRENT END EFFECTOR POSE:
 
     def _publish(self):
 
-        euler_current = quat2rpy(self._end_effector_pose.pose.pose.orientation, degrees=True)
-        euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
-
-        self._interface.clear()
-        self._interface.write_line(1, self.MSG_TELEOP)
-        self._interface.write_line(18, self.MSG_POSE.format(
-        self._end_effector_target.pose.pose.position.x,
-        self._end_effector_target.pose.pose.position.y,
-        self._end_effector_target.pose.pose.position.z,
-        euler_target[0], euler_target[1], euler_target[2],
-        self._end_effector_pose.pose.pose.position.x,
-        self._end_effector_pose.pose.pose.position.y,
-        self._end_effector_pose.pose.pose.position.z,
-        euler_current[0], euler_current[1], euler_current[2]))
-        self._interface.refresh()
-
         self._end_effector_target_publisher.publish(self._end_effector_target)
 
+    def _get_key(self):
+        tty.setraw(sys.stdin.fileno())
+        select.select([sys.stdin], [], [], 0)
+        key = sys.stdin.read(1)
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._settings)
+        return key
+
     def poll_keys(self):
-        self._running = True
-        while self._running:
-            while True:
-                keycode = self._interface.read_key()
-                if keycode is None:
-                    break
+
+        try:
+            print(self.MSG_TELEOP)
+
+            euler_current = quat2rpy(self._end_effector_pose.pose.pose.orientation, degrees=True)
+            euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
+
+            print(self.MSG_POSE.format(
+            self._end_effector_target.pose.pose.position.x,
+            self._end_effector_target.pose.pose.position.y,
+            self._end_effector_target.pose.pose.position.z,
+            euler_target[0], euler_target[1], euler_target[2],
+            self._end_effector_pose.pose.pose.position.x,
+            self._end_effector_pose.pose.pose.position.y,
+            self._end_effector_pose.pose.pose.position.z,
+            euler_current[0], euler_current[1], euler_current[2]))
+
+            while(1):
+                keycode = self._get_key()
+
                 self._key_pressed(keycode)
                 self._set_pose_target()
                 self._publish()
-                time.sleep(1.0/self._hz)
+
+        except Exception as e:
+            print(e)
+        
+        finally:
+            self._publish()
+
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._settings)
 
 def main(args=None):
-    try:
-        curses.wrapper(execute, args=args)
-    except KeyboardInterrupt:
-        pass
+    if args is None:
+        args = sys.argv
+
+    execute(args=args)
 
 if __name__ == '__main__':
     main()

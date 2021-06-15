@@ -28,7 +28,7 @@ def generate_launch_description():
         parameters=[
             panda_ros2_gazebo_parameter_file_path
         ],
-        output='screen'
+        # output='screen'
     )
 
     # TODO: Do I need to do any remappings somewhere since I don't want my robot description loaded to the standard robot_description topic?
