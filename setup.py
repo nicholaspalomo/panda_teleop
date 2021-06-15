@@ -45,8 +45,8 @@ Panda demo in ROS2.""",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "panda_keyboard_control = \
-                panda_teleop.panda_keyboard_control:main",
+            "panda_teleop_control = \
+                panda_teleop.panda_teleop_control:main",
         ],
     },
 )

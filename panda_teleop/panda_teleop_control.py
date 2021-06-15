@@ -18,6 +18,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.subscription import Subscription
+from rclpy.client import Client
 
 # ROS2 message and service data structures
 from nav_msgs.msg import Odometry
@@ -25,6 +26,7 @@ from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 from rcl_interfaces.srv import GetParameters
+from std_srvs.srv import Empty
 
 # For teleop control
 import curses
@@ -108,7 +110,7 @@ class TextWindow():
 
 class PandaTeleop(Node):
     def __init__(self, interface):
-        super().__init__('panda_keyboard_control')
+        super().__init__('panda_teleop_control')
 
         self._interface = interface
         self._running = True
@@ -126,6 +128,9 @@ class PandaTeleop(Node):
         # Create end effector target publisher
         self._end_effector_target_publisher: Publisher = self.create_publisher(Odometry, self.get_parameter('end_effector_target_topic').value, 10)
         self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, self.get_parameter('end_effector_pose_topic').value, self.callback_end_effector_odom, 10)
+
+        # Create a service for actuating the gripper. The service is requested via teleop
+        self._actuate_gripper_client: Client = self.create_client(Empty, 'actuate_gripper')
         
         self._end_effector_target_origin: Odometry = Odometry()
         self._end_effector_target_origin.pose.pose.position.x = 0.30701957005161057
@@ -160,7 +165,8 @@ t : up (+z)
 b : down (-z)
 y : +yaw
 n : -yaw
-anything else : stop
+z : open grippers/close grippers
+q : stop (quit)
 CTRL-C to quit
         """
         self.MSG_POSE = """CURRENT END EFFECTOR TARGET POSE:
@@ -202,6 +208,10 @@ CURRENT END EFFECTOR POSE:
             'n' : (0, -1)
         }
 
+        self._open_close_gripper_bindings = {
+            'z' : 0
+        }
+
         self._translation_limits = [[-0.4, 0.4], [-0.4, 0.4], [0.0, 0.5]] # xyz
         self._rotation_limits = [[-45., 45.], [-45., 45.], [-45., 45.]] # rpy
         self._dtheta = 1.0
@@ -227,6 +237,17 @@ CURRENT END EFFECTOR POSE:
         elif keycode in self._yaw_rotation_bindings.keys():
             self._last_pressed[keycode] = self.get_clock().now()
 
+        elif keycode in self._open_close_gripper_bindings.keys():
+
+            # Call the service to actuate the gripper
+            future = self._actuate_gripper_client.call_async(Empty())
+            if future.done():
+                try:
+                    response = future.result()
+                except Exception as e:
+                    self.get_logger().info('CALL TO ACTUATE GRIPPER SERVICE FAILED %r' % (e,))
+                else:
+                    self.get_logger().info('GRIPPER ACTUATED SUCCESSFULLY')
         else:
             return
 
@@ -236,7 +257,7 @@ CURRENT END EFFECTOR POSE:
         for a in self._last_pressed:
             if now - self._last_pressed[a] < Duration(seconds=0.4):
                 keys.append(a)
-        # TODO: Enforce workspace limits. Velocity inputs from user should be input in degrees
+
         for k in keys:
             if k in self._planar_translation_bindings.keys():
                 binding = self._planar_translation_bindings[k]
@@ -268,7 +289,7 @@ CURRENT END EFFECTOR POSE:
                 quat = rpy2quat(euler_target, input_in_degrees=True)
                 self._end_effector_target.pose.pose.orientation = copy.deepcopy(quat)
 
-            else: # yaw rotation
+            elif k in self._yaw_rotation_bindings.keys(): # yaw rotation
                 binding = self._yaw_rotation_bindings[k]
 
                 euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
@@ -280,6 +301,9 @@ CURRENT END EFFECTOR POSE:
                 # Convert rotation back to radians and back to a quaternion representation
                 quat = rpy2quat(euler_target, input_in_degrees=True)
                 self._end_effector_target.pose.pose.orientation = copy.deepcopy(quat)
+
+            else: # open/close the grippers
+                return
 
     def _publish(self):
 

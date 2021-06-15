@@ -23,8 +23,8 @@ def generate_launch_description():
     panda_teleop_node = launch_ros.actions.Node(
         package='panda_teleop',
         # namespace=...
-        executable='panda_keyboard_control',
-        name='panda_keyboard_control',
+        executable='panda_teleop_control',
+        name='panda_teleop_control',
         parameters=[
             panda_ros2_gazebo_parameter_file_path
         ],
