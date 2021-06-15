@@ -178,7 +178,7 @@ CURRENT END EFFECTOR POSE:
             'z' : 0
         }
 
-        self._translation_limits = [[-0.4, 0.4], [-0.4, 0.4], [0.0, 0.5]] # xyz
+        self._translation_limits = [[-0.1, 0.1], [-0.1, 0.1], [0.0, 1.0]] # xyz
         self._rotation_limits = [[-45., 45.], [-45., 45.], [-45., 45.]] # rpy
         self._dtheta = 1.0
         self._dx = 0.01
