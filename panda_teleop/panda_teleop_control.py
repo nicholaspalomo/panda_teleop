@@ -54,10 +54,10 @@ def execute(stdsrc, args):
 def quat2rpy(quat: Quaternion, degrees=True) -> List[float]:
 
     if degrees:
-        return [angle * 180./np.pi for angle in list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler())]
+        return [angle * 180./np.pi for angle in list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler())] # return the roll-pitch-yaw in degrees...
 
     else:
-        return list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler())
+        return list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler()) # ...or in radians
 
 def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
 
@@ -69,7 +69,7 @@ def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
     out.z = quat[2]
     out.w = quat[3]
 
-    return out
+    return out # return roll-pith-yaw angles as quaternion
 
 class TextWindow():
 
@@ -132,6 +132,7 @@ class PandaTeleop(Node):
         # Create a service for actuating the gripper. The service is requested via teleop
         self._actuate_gripper_client: Client = self.create_client(Empty, 'actuate_gripper')
         
+        # The initial pose is just the end effector location in the base frame at the nominal joint angles
         self._end_effector_target_origin: Odometry = Odometry()
         self._end_effector_target_origin.pose.pose.position.x = 0.30701957005161057
         self._end_effector_target_origin.pose.pose.position.y = -5.934817164959582e-12
@@ -142,6 +143,7 @@ class PandaTeleop(Node):
         self._end_effector_target_origin.pose.pose.orientation.w = 0.7071090038427887
         self._end_effector_target_origin.header.frame_id = self.get_parameter('base_frame').value
         self._end_effector_target_origin.header.child_frame_id = self.get_parameter('end_effector_frame').value
+        self._end_effector_target_origin.header.stamp = self.get_clock().now().to_msg()
 
         self._end_effector_target: Odometry = copy.deepcopy(self._end_effector_target_origin)
         self._end_effector_pose: Odometry = copy.deepcopy(self._end_effector_target)
@@ -245,7 +247,7 @@ CURRENT END EFFECTOR POSE:
                 try:
                     response = future.result()
                 except Exception as e:
-                    self.get_logger().info('CALL TO ACTUATE GRIPPER SERVICE FAILED %r' % (e,))
+                    self.get_logger().info('SERVICE CALL TO ACTUATE GRIPPER SERVICE FAILED %r' % (e,))
                 else:
                     self.get_logger().info('GRIPPER ACTUATED SUCCESSFULLY')
         else:
@@ -302,7 +304,7 @@ CURRENT END EFFECTOR POSE:
                 quat = rpy2quat(euler_target, input_in_degrees=True)
                 self._end_effector_target.pose.pose.orientation = copy.deepcopy(quat)
 
-            else: # open/close the grippers
+            else:
                 return
 
     def _publish(self):
@@ -332,7 +334,7 @@ CURRENT END EFFECTOR POSE:
                 keycode = self._interface.read_key()
                 if keycode is None:
                     break
-                self._key_pressed(keycode) # TODO: set target pose inside this method
+                self._key_pressed(keycode)
                 self._set_pose_target()
                 self._publish()
                 time.sleep(1.0/self._hz)
