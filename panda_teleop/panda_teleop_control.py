@@ -60,7 +60,7 @@ def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
 
     quat = R.from_euler('xyz', rpy, degrees=input_in_degrees).as_quat()
 
-    out = Quaternion
+    out = Quaternion()
     out.x = quat[0]
     out.y = quat[1]
     out.z = quat[2]
@@ -132,20 +132,21 @@ b : down (-z)
 y : +yaw
 n : -yaw
 z : open grippers/close grippers
+r : return to home position
 q : stop (quit)
 CTRL-C to quit
         """
         self.MSG_POSE = """CURRENT END EFFECTOR TARGET POSE:
 [x, y, z] = [{}, {}, {}] m
-[r, p, y] = [{}, {}, {}] rad (Euler)
+[r, p, y] = [{}, {}, {}] ° (Euler)
 CURRENT END EFFECTOR POSE:
 [x, y, z] = [{}, {}, {}] m
-[r, p, y] = [{}, {}, {}] rad (Euler)"""
+[r, p, y] = [{}, {}, {}] ° (Euler)"""
 
         self._planar_translation_bindings = { # +x, -x, +y, -y
             'u' : (1, 0, 1, 0),
             'i' : (1, 0, 0, 0),
-            'o' : (1, 0, 1, -1),
+            'o' : (1, 0, 0, -1),
             'j' : (0, 0, 1, 0),
             'l' : (0, 0, 0, -1),
             'm' : (0, -1, 1, 0),
@@ -178,7 +179,7 @@ CURRENT END EFFECTOR POSE:
             'z' : 0
         }
 
-        self._translation_limits = [[-0.1, 0.1], [-0.1, 0.1], [0.0, 1.0]] # xyz
+        self._translation_limits = [[0.0, 1.0], [-1.0, 1.0], [0.0, 1.0]] # xyz
         self._rotation_limits = [[-45., 45.], [-45., 45.], [-45., 45.]] # rpy
         self._dtheta = 1.0
         self._dx = 0.01
@@ -190,6 +191,11 @@ CURRENT END EFFECTOR POSE:
         if keycode == ord('q'):
             self._running = False
             os.kill(os.getpid(), signal.SIGINT)
+
+        if keycode == ord('r'):
+            # return the end effector to the home position
+            self._end_effector_target = copy.deepcopy(self._end_effector_target_origin)
+            self._end_effector_target.header.stamp = self.get_clock().now().to_msg()
 
         elif keycode in self._planar_translation_bindings.keys():
             self._last_pressed[keycode] = self.get_clock().now()
@@ -206,7 +212,7 @@ CURRENT END EFFECTOR POSE:
         elif keycode in self._open_close_gripper_bindings.keys():
 
             # Call the service to actuate the gripper
-            future = self._actuate_gripper_client.call_async(Empty())
+            future = self._actuate_gripper_client.call_async(Empty.Request())
             if future.done():
                 try:
                     response = future.result()
@@ -219,10 +225,11 @@ CURRENT END EFFECTOR POSE:
 
     def _set_pose_target(self):
         now = self.get_clock().now()
+        self._end_effector_target.header.stamp = now.to_msg()
         keys = []
         for a in self._last_pressed:
-            # if now - self._last_pressed[a] < Duration(seconds=0.4):
-            keys.append(a)
+            if now - self._last_pressed[a] < Duration(seconds=0.1):
+                keys.append(a)
 
         for k in keys:
             if k in self._planar_translation_bindings.keys():
@@ -285,23 +292,23 @@ CURRENT END EFFECTOR POSE:
     def poll_keys(self):
 
         try:
-            print(self.MSG_TELEOP)
-
-            euler_current = quat2rpy(self._end_effector_pose.pose.pose.orientation, degrees=True)
-            euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
-
-            print(self.MSG_POSE.format(
-            self._end_effector_target.pose.pose.position.x,
-            self._end_effector_target.pose.pose.position.y,
-            self._end_effector_target.pose.pose.position.z,
-            euler_target[0], euler_target[1], euler_target[2],
-            self._end_effector_pose.pose.pose.position.x,
-            self._end_effector_pose.pose.pose.position.y,
-            self._end_effector_pose.pose.pose.position.z,
-            euler_current[0], euler_current[1], euler_current[2]))
-
             while(1):
                 keycode = self._get_key()
+
+                print(self.MSG_TELEOP)
+
+                euler_current = quat2rpy(self._end_effector_pose.pose.pose.orientation, degrees=True)
+                euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
+
+                print(self.MSG_POSE.format(
+                self._end_effector_target.pose.pose.position.x,
+                self._end_effector_target.pose.pose.position.y,
+                self._end_effector_target.pose.pose.position.z,
+                euler_target[0], euler_target[1], euler_target[2],
+                self._end_effector_pose.pose.pose.position.x,
+                self._end_effector_pose.pose.pose.position.y,
+                self._end_effector_pose.pose.pose.position.z,
+                euler_current[0], euler_current[1], euler_current[2]))
 
                 self._key_pressed(keycode)
                 self._set_pose_target()
