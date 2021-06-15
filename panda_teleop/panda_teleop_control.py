@@ -180,7 +180,7 @@ CURRENT END EFFECTOR POSE:
         }
 
         self._translation_limits = [[0.0, 1.0], [-1.0, 1.0], [0.0, 1.0]] # xyz
-        self._rotation_limits = [[-45., 45.], [-45., 45.], [-45., 45.]] # rpy
+        self._rotation_limits = [[-90., 90.], [-90., 90.], [-90., 90.]] # rpy
         self._dtheta = 1.0
         self._dx = 0.01
 
@@ -188,14 +188,14 @@ CURRENT END EFFECTOR POSE:
         self._end_effector_pose = odom
 
     def _key_pressed(self, keycode):
-        if keycode == ord('q'):
+        if keycode == 'q':
+            self._home()
             self._running = False
             os.kill(os.getpid(), signal.SIGINT)
 
-        if keycode == ord('r'):
+        if keycode == 'r':
             # return the end effector to the home position
-            self._end_effector_target = copy.deepcopy(self._end_effector_target_origin)
-            self._end_effector_target.header.stamp = self.get_clock().now().to_msg()
+            self._home()
 
         elif keycode in self._planar_translation_bindings.keys():
             self._last_pressed[keycode] = self.get_clock().now()
@@ -222,6 +222,11 @@ CURRENT END EFFECTOR POSE:
                     self.get_logger().info('GRIPPER ACTUATED SUCCESSFULLY')
         else:
             return
+
+    def _home(self):
+            self._end_effector_target = copy.deepcopy(self._end_effector_target_origin)
+            self._end_effector_target.header.stamp = self.get_clock().now().to_msg()
+            self._publish()
 
     def _set_pose_target(self):
         now = self.get_clock().now()
@@ -267,7 +272,7 @@ CURRENT END EFFECTOR POSE:
 
                 euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
 
-                euler_target[2] = np.clip(euler_target[2] + binding[0] * self._dtheta, self._translation_limits[2][0], self._translation_limits[2][1])
+                euler_target[2] = np.clip(euler_target[2] + binding[0] * self._dtheta, self._rotation_limits[2][0], self._rotation_limits[2][1])
 
                 euler_target[2] = np.clip(euler_target[2] + binding[1] * self._dtheta, self._rotation_limits[2][0], self._rotation_limits[2][1])
 
