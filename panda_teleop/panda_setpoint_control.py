@@ -30,13 +30,13 @@ from .helpers import quat2rpy, rpy2quat
 np.set_printoptions(precision=4, suppress=True)
 
 def execute(args):
-    rclpy.init(args=args)
+    # rclpy.init(args=args)
 
     app = PandaSetpoint()
     app.poll_terminal()
 
     app.destroy_node()
-    rclpy.shutdown()
+    # rclpy.shutdown()
 
 class PandaSetpoint(Node):
     def __init__(self):
@@ -85,6 +85,8 @@ Enter an end effector pose target:
    - x, y, z target in CENTIMETERS
    - r, p, yaw target (x-y-z Euler angles) in DEGREES
    - change the gripper state (1: open->close or close->open, 0: keep current state)
+   - Press ENTER to return the end effector to the HOME pose
+Enter a list separated by SPACES:
         """
 
         self.MSG_POSE = """CURRENT END EFFECTOR TARGET POSE:
@@ -105,8 +107,16 @@ CURRENT END EFFECTOR POSE:
         self._end_effector_target_publisher.publish(self._end_effector_target)
 
     def _parse_user_input(self, user_input):
+        user_input_list = user_input.split()
 
-        if len(user_input) != 7:
+        if len(user_input_list) < 1:
+            print("[panda_teleop]: [INFO] Returning to HOME pose.")
+            self._end_effector_target = copy.deepcopy(self._end_effector_target_origin)
+            self._end_effector_target.header.stamp = self.get_clock().now().to_msg()
+            self._publish()
+            return False
+
+        if len(user_input_list) < 7:
             print("[panda_teleop]: [ERR] Setpoint should contain 7 values.")
             return False
 
@@ -114,15 +124,16 @@ CURRENT END EFFECTOR POSE:
 
     def _set_pose_target(self, user_input):
 
-        # TODO: Make sure to convert everything to a float before putting it into the message structure
-        for i, value in enumerate(user_input):
+        self._end_effector_target.header.stamp = self.get_clock().now().to_msg()
+        for i, value in enumerate(user_input.split()[:7]):
+            print(np.float_(value))
             if i < 3:
                 # set the translation target
-                self._end_effector_target.pose.pose.position.x = np.clip(np.float_(value), self._translation_limits[0][0], self._translation_limits[0][1])
+                self._end_effector_target.pose.pose.position.x = np.clip(np.float_(value) / 100., self._translation_limits[0][0], self._translation_limits[0][1])
 
-                self._end_effector_target.pose.pose.position.y = np.clip(np.float_(value), self._translation_limits[1][0], self._translation_limits[1][1])
+                self._end_effector_target.pose.pose.position.y = np.clip(np.float_(value) / 100., self._translation_limits[1][0], self._translation_limits[1][1])
 
-                self._end_effector_target.pose.pose.position.z = np.clip(np.float_(value), self._translation_limits[2][0], self._translation_limits[2][1])
+                self._end_effector_target.pose.pose.position.z = np.clip(np.float_(value) / 100., self._translation_limits[2][0], self._translation_limits[2][1])
 
             if i >= 3 and i < 6:
                 # set the rotation target
@@ -148,12 +159,12 @@ CURRENT END EFFECTOR POSE:
 
         try:
             while(1):
+                print(self.MSG_TERMINAL)
                 setpoint = input("[x, y, z, r, p, yaw, gripper] = ")
 
                 if self._parse_user_input(setpoint):
                     self._set_pose_target(setpoint)
-
-                    print(self.MSG_TERMINAL)
+                    self._publish()
 
                     rclpy.spin_once(self) # this is necessary, otherwise the odom callback will never be called within this while loop
 
@@ -176,11 +187,12 @@ CURRENT END EFFECTOR POSE:
         finally:
             self._publish()
 
-def main(args=None):
-    if args is None:
-        args = sys.argv
+### UNCOMMENT FOLLOWING LINES TO DEBUG
+# def main(args=None):
+#     if args is None:
+#         args = sys.argv
 
-    execute(args=args)
+#     execute(args=args)
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

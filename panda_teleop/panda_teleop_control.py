@@ -36,13 +36,13 @@ from .helpers import quat2rpy, rpy2quat
 np.set_printoptions(precision=4, suppress=True)
 
 def execute(args):
-    rclpy.init(args=args)
+    # rclpy.init(args=args)
 
     app = PandaTeleop()
     app.poll_keys()
 
     app.destroy_node()
-    rclpy.shutdown()
+    # rclpy.shutdown()
 
 class PandaTeleop(Node):
     def __init__(self):
@@ -301,11 +301,12 @@ CURRENT END EFFECTOR POSE:
 
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._settings)
 
-def main(args=None):
-    if args is None:
-        args = sys.argv
+### UNCOMMENT FOLLOWING LINES TO DEBUG
+# def main(args=None):
+#     if args is None:
+#         args = sys.argv
 
-    execute(args=args)
+#     execute(args=args)
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
