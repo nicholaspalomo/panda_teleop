@@ -10,8 +10,11 @@ $ source install/setup.bash
 ```
 and launch the teleop node with:
 ```
-$ ros2 launch panda_teleop panda_teleop_control.launch.py 
+$ ros2 launch panda_teleop panda_teleop_control.launch.py mode:=<keyboard operation mode>
 ```
+where `<keyboard operation mode>` is either:
+- `teleop` if you wish to move the end effector using keystroke mappings from the keyboard, or
+- `setpoint` if you wish to specify an array of values denoting the end effector target pose directly.
 
 Upon launching this node, an xterm console will appear. Press `ENTER`/`RETURN` to make the cursor and help text appear.
 
