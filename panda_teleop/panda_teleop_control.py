@@ -89,7 +89,7 @@ class PandaTeleop(Node):
         # TODO: At the moment I'm unable to load the parameter directly from the parameter server. Later I need to modify this code to include that functionality.
         # Create end effector target publisher
         self._end_effector_target_publisher: Publisher = self.create_publisher(Odometry, 'end_effector_target_pose', qos_profile_system_default)
-        self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, 'end_effector_pose', self.callback_end_effector_odom, 10)
+        self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, '/end_effector_pose', self.callback_end_effector_odom, 10)
 
         self._hz = self.declare_parameter('hz', 10.0).value
 
@@ -301,6 +301,8 @@ CURRENT END EFFECTOR POSE:
                 keycode = self._get_key()
 
                 print(self.MSG_TELEOP)
+
+                rclpy.spin_once(self) # this is necessary, otherwise the odom callback will never be called within this while loop
 
                 euler_current = quat2rpy(self._end_effector_pose.pose.pose.orientation, degrees=True)
                 euler_target = quat2rpy(self._end_effector_target.pose.pose.orientation, degrees=True)
