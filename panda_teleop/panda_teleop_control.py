@@ -4,11 +4,8 @@
 
 # TODO: Have a model that spawns which does not have any collision meshses. For now, just try to get it working with basic teleop
 # TODO: This class only subscribes to joint states and publishes to end_effector_target
-# TODO: Implement a software stop to set the end_effector_target to the current location if a problem is encountered
-# TODO: Make sure that the position and rotation limits are enforced
 
 import numpy as np
-from numpy import random
 from scipy.spatial.transform import Rotation as R
 import copy
 from typing import List
@@ -23,22 +20,17 @@ from rclpy.client import Client
 # ROS2 message and service data structures
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
-from rcl_interfaces.srv import GetParameters
 from std_srvs.srv import Empty
 
 # For teleop control
 from rclpy.duration import Duration
 from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import Header
 
 import sys, select, termios, tty
 
 # For 'q' keystroke exit
 import os
 import signal
-import time
 
 # Configure numpy output
 np.set_printoptions(precision=4, suppress=True)
