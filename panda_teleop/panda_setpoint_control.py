@@ -2,9 +2,6 @@
 # This software may be modified and distributed under the terms of the
 # GNU Lesser General Public License v2.1 or any later version.
 
-# TODO: This script should allow the user to set an array of values in the terminal representing the desired pose target. -> 7 values: x, y, z, r, p, yaw, open/close
-# TODO: Create a runner script like you do in the panda_ros2_gazebo repo to allow the user to choose between the two setpoint selection methods (teleop or command line)
-
 import sys
 import numpy as np
 from scipy.spatial.transform import Rotation as R
