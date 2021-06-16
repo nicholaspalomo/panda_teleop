@@ -4,14 +4,9 @@
 
 # TODO: Have a model that spawns which does not have any collision meshses. For now, just try to get it working with basic teleop
 # TODO: This class only subscribes to joint states and publishes to end_effector_target
-# TODO: Implement a software stop to set the end_effector_target to the current location if a problem is encountered
-# TODO: Make sure that the position and rotation limits are enforced
 
 import numpy as np
-from numpy import random
-from scipy.spatial.transform import Rotation as R
 import copy
-from typing import List
 
 # ROS2 Python API libraries
 import rclpy
@@ -22,57 +17,37 @@ from rclpy.client import Client
 
 # ROS2 message and service data structures
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Quaternion
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
-from rcl_interfaces.srv import GetParameters
 from std_srvs.srv import Empty
 
 # For teleop control
 from rclpy.duration import Duration
 from rclpy.qos import qos_profile_system_default
-from std_msgs.msg import Header
 
 import sys, select, termios, tty
 
 # For 'q' keystroke exit
 import os
 import signal
-import time
+
+# Helpers
+from .helpers import quat2rpy, rpy2quat
 
 # Configure numpy output
 np.set_printoptions(precision=4, suppress=True)
 
 def execute(args):
-    rclpy.init(args=args)
+    # rclpy.init(args=args)
 
     app = PandaTeleop()
     app.poll_keys()
 
     app.destroy_node()
-    rclpy.shutdown()
-
-def quat2rpy(quat: Quaternion, degrees=True) -> List[float]:
-
-    return list(R.from_quat([quat.x, quat.y, quat.z, quat.w]).as_euler('xyz', degrees=degrees))
-
-def rpy2quat(rpy: List[float], input_in_degrees=False) -> Quaternion:
-
-    quat = R.from_euler('xyz', rpy, degrees=input_in_degrees).as_quat()
-
-    out = Quaternion()
-    out.x = quat[0]
-    out.y = quat[1]
-    out.z = quat[2]
-    out.w = quat[3]
-
-    return out # return roll-pith-yaw angles as quaternion
+    # rclpy.shutdown()
 
 class PandaTeleop(Node):
     def __init__(self):
         super().__init__('panda_teleop_control')
 
-        self._running = True
         self._last_pressed = {}
         self._settings = termios.tcgetattr(sys.stdin)
 
@@ -91,8 +66,6 @@ class PandaTeleop(Node):
         self._end_effector_target_publisher: Publisher = self.create_publisher(Odometry, 'end_effector_target_pose', qos_profile_system_default)
         self._end_effector_pose_subscriber: Subscription = self.create_subscription(Odometry, '/end_effector_pose', self.callback_end_effector_odom, 10)
 
-        self._hz = self.declare_parameter('hz', 10.0).value
-
         # Create a service for actuating the gripper. The service is requested via teleop
         self._actuate_gripper_client: Client = self.create_client(Empty, 'actuate_gripper')
         
@@ -105,8 +78,8 @@ class PandaTeleop(Node):
         self._end_effector_target_origin.pose.pose.orientation.y = 0.7071045301233027
         self._end_effector_target_origin.pose.pose.orientation.z = 0.00014171064119222223
         self._end_effector_target_origin.pose.pose.orientation.w = 0.7071090038427887
-        self._end_effector_target_origin.header.frame_id = 'panda_link0'
-        self._end_effector_target_origin.child_frame_id = 'end_effector_frame'
+        self._end_effector_target_origin.header.frame_id = 'panda_link0' # TODO: Remove hardcoded parameters
+        self._end_effector_target_origin.child_frame_id = 'end_effector_frame' # TODO: Remove hardcoded parameters
         self._end_effector_target_origin.header.stamp = self.get_clock().now().to_msg()
 
         self._end_effector_target: Odometry = copy.deepcopy(self._end_effector_target_origin)
@@ -190,7 +163,6 @@ CURRENT END EFFECTOR POSE:
     def _key_pressed(self, keycode):
         if keycode == 'q':
             self._home()
-            self._running = False
             os.kill(os.getpid(), signal.SIGINT)
 
         if keycode == 'r':
@@ -329,11 +301,12 @@ CURRENT END EFFECTOR POSE:
 
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._settings)
 
-def main(args=None):
-    if args is None:
-        args = sys.argv
+### UNCOMMENT FOLLOWING LINES TO DEBUG
+# def main(args=None):
+#     if args is None:
+#         args = sys.argv
 
-    execute(args=args)
+#     execute(args=args)
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()

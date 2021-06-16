@@ -46,7 +46,7 @@ Panda demo in ROS2.""",
     entry_points={
         "console_scripts": [
             "panda_teleop_control = \
-                panda_teleop.panda_teleop_control:main",
+                panda_teleop.runner:main",
         ],
     },
 )
