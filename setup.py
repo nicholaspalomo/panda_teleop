@@ -45,7 +45,7 @@ Panda demo in ROS2.""",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "panda_teleop_control = \
+            "panda_teleop = \
                 panda_teleop.runner:main",
         ],
     },

@@ -9,8 +9,8 @@ import os
 def generate_launch_description():
     mode = LaunchConfiguration('mode', default='teleop')
     pkg_share = launch_ros.substitutions.FindPackageShare(package='panda_teleop').find('panda_teleop')
-    panda_ros2_gazebo_pkg_share = launch_ros.substitutions.FindPackageShare(package='panda_ros2_gazebo').find('panda_ros2_gazebo')
-    panda_ros2_gazebo_parameter_file_path = os.path.join(panda_ros2_gazebo_pkg_share,
+    panda_control_pkg_share = launch_ros.substitutions.FindPackageShare(package='panda_control').find('panda_control')
+    panda_control_parameter_file_path = os.path.join(panda_control_pkg_share,
         "config",
         "params.yaml"
     )
@@ -27,7 +27,7 @@ def generate_launch_description():
         executable='panda_teleop_control',
         name='panda_teleop_control',
         parameters=[
-            panda_ros2_gazebo_parameter_file_path
+            panda_control_parameter_file_path
         ],
         output='screen',
         prefix=['xterm -e'], # FOR DEBUG: prefix=['xterm -hold -e'] to 'hold' the xterm window open
